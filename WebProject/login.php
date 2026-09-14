@@ -1,12 +1,7 @@
 <?php
-// POST /login.php
-// Expects JSON: { username, password } — "username" here is the email
-// the person signed up with (matches the front-end's login form).
-//
-// On success, this starts a real PHP session ($_SESSION) so the
-// browser's session cookie carries the logged-in state across every
-// page automatically — no more relying on the front-end's localStorage
-// to remember who's logged in.
+// login.php
+// Checks email + password. If correct, starts a session so the person
+// stays logged in on every page (no more localStorage tricks).
 
 session_start();
 header('Content-Type: application/json');
@@ -25,7 +20,7 @@ if ($username === '' || $password === '') {
 
 $emailLower = strtolower($username);
 
-$stmt = $conn->prepare('SELECT first_name, last_name, email, password, role FROM users WHERE email = ?');
+$stmt = $conn->prepare('SELECT first_name, last_name, email, password, role, avatar_path FROM users WHERE email = ?');
 if (!$stmt) {
     http_response_code(500);
     echo json_encode(['error' => 'Database error: ' . $conn->error]);
@@ -51,8 +46,7 @@ if (!password_verify($password, $user['password'])) {
     exit;
 }
 
-// Log this login — powers "Recent Activity" on the user dashboard and
-// the "Total Logins" stat on the admin dashboard.
+// save this login so it shows up in "Recent Activity" and the admin's login count
 $logStmt = $conn->prepare('INSERT INTO activity_log (user_email, activity) VALUES (?, ?)');
 if ($logStmt) {
     $activityText = 'Logged in';
@@ -63,21 +57,22 @@ if ($logStmt) {
 
 $conn->close();
 
-// Real server-side session — this is what actually persists across
-// pages, via the PHPSESSID cookie the browser sends automatically.
-$_SESSION['user_id']    = $user['email']; // no numeric id column yet; email is unique so it works as the session key
-$_SESSION['first_name'] = $user['first_name'];
-$_SESSION['last_name']  = $user['last_name'];
-$_SESSION['email']      = $user['email'];
-$_SESSION['role']       = $user['role'];
+// save who's logged in — the browser gets a session cookie automatically
+$_SESSION['user_id']     = $user['email']; // no id column yet, email is unique so this works
+$_SESSION['first_name']  = $user['first_name'];
+$_SESSION['last_name']   = $user['last_name'];
+$_SESSION['email']       = $user['email'];
+$_SESSION['role']        = $user['role'];
+$_SESSION['avatar_path'] = $user['avatar_path'];
 
 http_response_code(200);
 echo json_encode([
     'message' => 'Login successful.',
     'user' => [
-        'firstName' => $user['first_name'],
-        'lastName'  => $user['last_name'],
-        'email'     => $user['email'],
-        'role'      => $user['role']
+        'firstName'  => $user['first_name'],
+        'lastName'   => $user['last_name'],
+        'email'      => $user['email'],
+        'role'       => $user['role'],
+        'avatarPath' => $user['avatar_path']
     ]
 ]);

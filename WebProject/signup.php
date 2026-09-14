@@ -1,10 +1,6 @@
 <?php
-// POST /signup.php
-// Expects JSON: { firstName, lastName, email, password, phone, address,
-//                 cityStateZip, paymentMethod }
-// Matches the users table: first_name, last_name, email, password
-// (a bcrypt/argon hash via password_hash(), never the raw password),
-// phone_number, address, city_state_zip, payment_method.
+// signup.php
+// Creates a new account.
 
 header('Content-Type: application/json');
 require_once 'config.php';
@@ -42,7 +38,7 @@ if (!in_array($paymentMethod, $allowedPayments, true)) {
 
 $emailLower = strtolower($email);
 
-// Check for an existing account with this email
+// check email isn't already used
 $stmt = $conn->prepare('SELECT id FROM users WHERE email = ?');
 if (!$stmt) {
     http_response_code(500);
@@ -62,8 +58,7 @@ if ($stmt->num_rows > 0) {
 }
 $stmt->close();
 
-// Never store the raw password — only the hash. password_hash() picks a
-// strong algorithm (bcrypt by default) and embeds its own salt.
+// hash the password, never store the real one
 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 
 $stmt = $conn->prepare(
@@ -90,7 +85,7 @@ if (!$stmt->execute()) {
     exit;
 }
 
-// Log account creation — powers "Recent Activity" on the user dashboard.
+// log this so it shows up later in the user's "Recent Activity"
 $logStmt = $conn->prepare('INSERT INTO activity_log (user_email, activity) VALUES (?, ?)');
 if ($logStmt) {
     $activityText = 'Created account';

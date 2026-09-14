@@ -273,6 +273,23 @@
                     <button type="button" class="btn btn-primary" onclick="showWipToast(event)">Manage All Projects</button>
                 </div>
             </div>
+
+            <div class="dash-panel dash-panel-wide">
+                <div class="dash-panel-label">Registered Users</div>
+                <table class="dash-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Joined</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-users-tbody">
+                        <tr><td colspan="4" class="dash-empty-row">No data yet.</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
       </div>
     </div>

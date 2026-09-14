@@ -15,9 +15,7 @@
             <span>TrashPandaStudio</span>
         </div>
         <div class="header-right">
-            <!-- Log-in / Sign-up aren't built yet, so they trigger the WIP toast.
-                 When accounts are ready: remove onclick and point these at the
-                 real log-in/sign-up pages (or swap <button> for <a href="..."> ). -->
+            <!-- Log-in / Sign-up open a popup for now (see script.js) -->
             <div class="header-actions auth-buttons-group">
                 <button type="button" class="btn btn-primary btn-sm" onclick="openAuthModal('login')">LOG-IN</button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="openAuthModal('signup')">SIGN-UP</button>
@@ -27,18 +25,7 @@
             </button>
             <input type="file" id="avatar-file-input" accept="image/*" hidden>
             <nav>
-            <!--
-                Nav links: only "Home", "About Us" and "Gallery" are live pages
-                right now. The rest are placeholder pages that aren't built yet,
-                so they trigger the "work in progress" toast instead of
-                navigating anywhere.
-
-                WHEN A PAGE IS READY:
-                1. Remove that link's  onclick="showWipToast(event)"  attribute
-                2. Change its  href="#"  to the real page/section link
-                (Leave the "active" class alone — that's just what marks the
-                current page as highlighted in the nav.)
-            -->
+            <!-- nav links -->
             <ul>
                 <li><a href="#" class="active" onclick="return false;">Home</a></li>
                 <li><a href="about.php">About Us</a></li>
@@ -275,6 +262,23 @@
                 <div style="display:flex; justify-content:flex-end; margin-top:20px;">
                     <button type="button" class="btn btn-primary" onclick="showWipToast(event)">Manage All Projects</button>
                 </div>
+            </div>
+
+            <div class="dash-panel dash-panel-wide">
+                <div class="dash-panel-label">Registered Users</div>
+                <table class="dash-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Joined</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-users-tbody">
+                        <tr><td colspan="4" class="dash-empty-row">No data yet.</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
       </div>

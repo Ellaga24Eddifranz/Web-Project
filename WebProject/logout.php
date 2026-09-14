@@ -1,8 +1,6 @@
 <?php
-// POST /logout.php
-// Destroys the real PHP session server-side. This is what actually
-// logs someone out now — clearing localStorage alone wouldn't be
-// enough once the server is the source of truth.
+// logout.php
+// Ends the session — this is what actually logs someone out.
 
 session_start();
 $_SESSION = [];

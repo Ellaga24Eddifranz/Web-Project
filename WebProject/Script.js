@@ -1,12 +1,11 @@
 let wipTimer = null;
 
-// Shared across any form on the site that needs email format validation
+// used to check email formats on any form on the site
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// The Log-In / Sign-Up forms talk to a small PHP + MySQL backend
-// (signup.php, login.php, config.php) running under XAMPP alongside
-// these pages. Passwords are hashed with PHP's password_hash() —
-// never stored or compared in plain text.
+// Log-In / Sign-Up talk to login.php / signup.php / config.php, a small
+// PHP + MySQL backend running under XAMPP. Passwords are hashed with
+// password_hash() — we never store or check the real password.
 
 function showWipToast(event) {
     if (event) event.preventDefault();
@@ -18,10 +17,9 @@ function showWipToast(event) {
     }, 2800);
 }
 
-/* ---------- Log-In / Sign-Up modal ----------
-   Pops the Log-In or Sign-Up card up over the current page instead of
-   navigating to login.html / signup.html. Any page that includes the
-   #login-modal / #signup-modal markup gets this for free. */
+/* ---------- Log-In / Sign-Up popup ----------
+   Opens the Log-In or Sign-Up card on top of the current page instead
+   of going to a different page. */
 function openAuthModal(type) {
     const modal = document.getElementById(type + '-modal');
     if (!modal) return;
@@ -41,22 +39,14 @@ function switchAuthModal(event, toType) {
     openAuthModal(toType);
 }
 
-/* ---------- Logged-in session (real PHP session + cookie) ----------
-   The server (session-check.php) is now the single source of truth for
-   whether someone is logged in and what role they have — it reads the
-   PHP session via the browser's automatic session cookie. This replaced
-   an earlier localStorage-only approach that didn't reliably persist
-   across page navigations.
-
-   currentUser holds a plain in-memory copy of whatever session-check.php
-   last reported, just so other functions (openDashboard, the profile
-   icon click handler) don't need to re-fetch it constantly. It resets
-   on every full page load and gets refreshed by checkSession() below. */
+/* ---------- Who's logged in ----------
+   session-check.php is the single source of truth for who's logged in.
+   currentUser is just a copy of that in memory so we don't have to
+   re-fetch it constantly. It resets on every page load and gets
+   refreshed by checkSession() below. */
 let currentUser = null;
 
-// Asks the server "am I logged in, and as whom?" via the session
-// cookie. Updates currentUser and the header UI to match. Called once
-// on every page load, and again right after a successful login.
+// asks the server "am I logged in?" using the session cookie
 async function checkSession() {
     try {
         const response = await fetch('session-check.php', {
@@ -66,11 +56,7 @@ async function checkSession() {
         });
         const data = await response.json();
 
-        if (data.loggedIn) {
-            currentUser = data.user;
-        } else {
-            currentUser = null;
-        }
+        currentUser = data.loggedIn ? data.user : null;
     } catch (err) {
         console.error('checkSession failed:', err);
         currentUser = null;
@@ -80,10 +66,7 @@ async function checkSession() {
     return currentUser;
 }
 
-// Swaps every Log-In/Sign-Up button group (header AND footer) for the
-// profile icon, and back again, based on currentUser. Reads currentUser
-// directly rather than any storage — checkSession() is what keeps
-// currentUser accurate.
+// swaps the LOG-IN/SIGN-UP buttons for the profile icon, and back again
 function refreshAuthHeaderUI() {
     document.querySelectorAll('.auth-buttons-group').forEach((el) => {
         el.style.display = currentUser ? 'none' : '';
@@ -93,20 +76,24 @@ function refreshAuthHeaderUI() {
         btn.classList.toggle('show', Boolean(currentUser));
     });
 
-    if (currentUser) {
-        document.querySelectorAll('.profile-icon-img').forEach((img) => {
-            img.src = currentUser.avatarDataUrl || 'images/default icon.png';
-        });
-    }
+    updateAvatarImages();
 }
 
-/* ---------- Admin Console / User Dashboard overlay ----------
-   Opens as a full-screen layer over whatever page you're currently on;
-   the exit (X) button just closes it and leaves you back where you
-   were — it does not log you out. */
+// sets every profile picture on the page to whatever the current
+// account actually has saved — or the default icon if logged out or
+// no picture was ever uploaded. Called any time currentUser changes,
+// so a picture never carries over from one account to a different one.
+function updateAvatarImages() {
+    const src = (currentUser && currentUser.avatarPath) ? currentUser.avatarPath : 'images/default icon.png';
+    document.querySelectorAll('.profile-icon-img').forEach((img) => { img.src = src; });
+    document.querySelectorAll('.dash-avatar-img').forEach((img) => { img.src = src; });
+}
+
+/* ---------- Admin Console / User Dashboard popup ----------
+   Opens on top of the current page. The X button just closes it, it
+   does not log you out. */
 function openDashboard(role) {
-    // Hard requirement: no logged-in user, no dashboard.
-    if (!currentUser) return;
+    if (!currentUser) return; // no login, no dashboard
 
     const id = role === 'admin' ? 'admin-dashboard' : 'user-dashboard';
     const overlay = document.getElementById(id);
@@ -135,8 +122,7 @@ function closeDashboard(role) {
     document.body.style.overflow = '';
 }
 
-// Destroys the real server-side session (via logout.php) and resets
-// the UI back to logged-out state.
+// ends the real session on the server and resets the page back to logged out
 async function logOut() {
     try {
         await fetch('logout.php', { method: 'POST', credentials: 'same-origin' });
@@ -146,13 +132,13 @@ async function logOut() {
     currentUser = null;
     closeDashboard('admin');
     closeDashboard('user');
-    refreshAuthHeaderUI();
+    refreshAuthHeaderUI(); // this also resets every avatar picture back to default
 }
 
-/* ---------- Admin Console: live data ----------
-   Pulls real numbers + the briefs table from admin-data.php. Only ever
-   succeeds server-side if the session's role is 'admin' — a regular
-   user hitting this endpoint directly gets a 403, not real data. */
+/* ---------- Admin Console: pulling real data ----------
+   admin-data.php only ever answers with real data if the session's
+   role is 'admin' — anyone else gets refused, even if they call this
+   URL directly. */
 async function loadAdminDashboardData() {
     try {
         const response = await fetch('admin-data.php', { method: 'GET', credentials: 'same-origin' });
@@ -169,6 +155,24 @@ async function loadAdminDashboardData() {
             const el = document.getElementById(id);
             if (el) el.textContent = value;
         });
+
+        const usersTbody = document.getElementById('admin-users-tbody');
+        if (usersTbody) {
+            usersTbody.innerHTML = '';
+            if (data.users.length === 0) {
+                usersTbody.innerHTML = '<tr><td colspan="4" class="dash-empty-row">No data yet.</td></tr>';
+            } else {
+                data.users.forEach((user) => {
+                    const tr = document.createElement('tr');
+                    [user.name, user.email, user.role, user.joined].forEach((value) => {
+                        const td = document.createElement('td');
+                        td.textContent = value;
+                        tr.appendChild(td);
+                    });
+                    usersTbody.appendChild(tr);
+                });
+            }
+        }
 
         const briefsTbody = document.getElementById('admin-briefs-tbody');
         if (briefsTbody) {
@@ -194,10 +198,9 @@ async function loadAdminDashboardData() {
     }
 }
 
-/* ---------- User Dashboard: live data ----------
-   Pulls the logged-in user's own activity log + submitted briefs from
-   user-data.php. Always scoped server-side to the current session's
-   email — a user can never see another user's rows this way. */
+/* ---------- User Dashboard: pulling real data ----------
+   user-data.php always answers with only the logged-in account's own
+   data — never anyone else's. */
 async function loadUserDashboardData() {
     try {
         const response = await fetch('user-data.php', { method: 'GET', credentials: 'same-origin' });
@@ -246,10 +249,8 @@ async function loadUserDashboardData() {
     }
 }
 
-/* ---------- Lightbox: click a photo to see it full-size ----------
-   Any <img class="zoomable"> on the page automatically gets this
-   behavior — no per-image setup needed. To make a new photo
-   clickable later, just add class="zoomable" to its <img> tag. */
+/* ---------- Lightbox: click a photo to see it bigger ----------
+   Any <img class="zoomable"> gets this automatically. */
 function openLightbox(src, alt) {
     const overlay = document.getElementById('lightbox-overlay');
     const img = document.getElementById('lightbox-img');
@@ -265,7 +266,7 @@ function closeLightbox() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    checkSession(); // asks session-check.php whether we're logged in, via the session cookie
+    checkSession(); // ask the server if we're logged in
 
     document.querySelectorAll('img.zoomable').forEach((img) => {
         img.addEventListener('click', () => openLightbox(img.src, img.alt));
@@ -287,7 +288,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Same backdrop-click behavior for the dashboard overlays
     document.querySelectorAll('.dashboard-overlay').forEach((overlay) => {
         overlay.addEventListener('click', (event) => {
             if (event.target === overlay) {
@@ -297,24 +297,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    /* ---------- Profile icon → opens your dashboard ----------
-       Clicking the round profile icon (header or footer) takes you to
-       your Admin Console or User Dashboard, based on your session role —
-       it does NOT prompt a photo upload. Photo upload happens from
-       *inside* the dashboard instead (see below). */
+    /* ---------- Profile icon opens the dashboard ---------- */
     document.querySelectorAll('.profile-icon-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
             if (currentUser) openDashboard(currentUser.role);
         });
     });
 
-    /* ---------- Dashboard avatar → photo upload ----------
-       Clicking the avatar circle inside the Admin Console / User
-       Dashboard opens a file picker. The chosen image previews
-       immediately everywhere the avatar appears. NOTE: this only lasts
-       for the current page — there's no server endpoint yet to store
-       the photo against the account, so it resets on the next page
-       load or a different device until that's built. */
+    /* ---------- Clicking the dashboard avatar uploads a new picture ----------
+       Sends the picture to upload-avatar.php, which saves it against
+       the logged-in account. This is what makes the picture stick to
+       the right account instead of leaking to whoever logs in next. */
     const avatarFileInput = document.getElementById('avatar-file-input');
     if (avatarFileInput) {
         document.querySelectorAll('.profile-avatar-lg').forEach((avatarWrap) => {
@@ -322,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarWrap.addEventListener('click', () => avatarFileInput.click());
         });
 
-        avatarFileInput.addEventListener('change', () => {
+        avatarFileInput.addEventListener('change', async () => {
             const file = avatarFileInput.files[0];
             if (!file) return;
 
@@ -332,20 +325,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const reader = new FileReader();
-            reader.onload = () => {
-                if (!currentUser) return;
-                // NOTE: only kept in memory for this page load — there's
-                // no backend endpoint yet to save the photo against the
-                // account, so it resets on the next page/reload.
-                currentUser.avatarDataUrl = reader.result;
-                refreshAuthHeaderUI();
-                document.querySelectorAll('.dash-avatar-img').forEach((img) => {
-                    img.src = reader.result;
+            if (!currentUser) {
+                avatarFileInput.value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('avatar', file);
+
+            try {
+                const response = await fetch('upload-avatar.php', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: formData
                 });
-            };
-            reader.readAsDataURL(file);
-            avatarFileInput.value = '';
+                const data = await response.json();
+
+                if (!response.ok) {
+                    alert(data.message || 'Could not upload the image.');
+                    return;
+                }
+
+                currentUser.avatarPath = data.avatarPath;
+                updateAvatarImages();
+            } catch (err) {
+                alert('Could not reach the server to save the picture.');
+            } finally {
+                avatarFileInput.value = '';
+            }
         });
     }
 
@@ -360,10 +367,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /* ---------- User Dashboard: My Account (Edit) ----------
-       Front-end only for now — updates the session's display copy of the
-       email locally so the UI reflects the change, but there's no
-       backend endpoint yet to actually update the users table. Wire this
-       up to a real PHP endpoint before relying on it. */
+       This still only updates the on-screen copy — there's no backend
+       yet to actually change the email in the database. Wire that up
+       before relying on this for real. */
     const accountSaveBtn = document.getElementById('account-save-btn');
     if (accountSaveBtn) {
         accountSaveBtn.addEventListener('click', () => {
@@ -389,9 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    /* ---------- Back-to-top button ----------
-       Shows the button once the user scrolls down a bit, hides it
-       again near the top. Clicking it smooth-scrolls back up. */
+    /* ---------- Back-to-top button ---------- */
     const backToTop = document.getElementById('back-to-top');
     if (backToTop) {
         const toggleBackToTop = () => {
@@ -409,13 +413,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    /* ---------- Project Brief drag-and-drop + real submission (Services page) ----------
-       Only runs if the #dropzone element exists on the page, so it's
-       safe to leave this in the shared script.js for every page.
-       Submission now requires being logged in, and actually POSTs to
-       submit-brief.php so it shows up in both the admin's "Project
-       Brief Management" table and the submitting user's "My Project"
-       dashboard panel. */
+    /* ---------- Project Brief form (Services page) ----------
+       Needs to be logged in — the brief gets tied to that account so
+       it shows up in the admin's brief table and the user's own
+       dashboard. Actually uploads to submit-brief.php now. */
     const dropzone = document.getElementById('dropzone');
     if (dropzone) {
         const fileInput = document.getElementById('brief-file-input');
@@ -564,9 +565,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ---------- Contact form (Contact page) ----------
-       Only runs if #contact-send exists on the page. Validates the
-       three fields client-side, then shows the WIP toast since there's
-       no backend yet to actually send the message. */
+       No backend yet to actually send the message, so this just shows
+       the WIP toast once the fields are valid. */
     const contactSend = document.getElementById('contact-send');
     if (contactSend) {
         const nameInput = document.getElementById('contact-name');
@@ -599,17 +599,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!valid) return;
 
-            // Validated and ready to send, but there's no backend yet —
-            // show the WIP toast for now. Once a submission endpoint
-            // exists, replace this call with the real fetch logic.
             showWipToast(event);
         });
     }
 
     /* ---------- Sign-Up form ----------
-       Validates everything client-side, then sends it to the backend
-       API (see /server) to create the account, and sends the person
-       to the Log-In page. */
+       Validates the fields, then sends them to signup.php to create
+       the account, then opens the Log-In popup. */
     const signupSubmit = document.getElementById('signup-submit');
     if (signupSubmit) {
         const firstNameInput = document.getElementById('signup-first-name');
@@ -633,7 +629,6 @@ document.addEventListener('DOMContentLoaded', () => {
         signupSubmit.addEventListener('click', async () => {
             let valid = true;
 
-            // Clear previous error states
             [firstNameInput, lastNameInput, emailInput, passwordInput,
                 confirmInput, phoneInput, addressInput, cityStateZipInput,
                 paymentSelect].forEach((el) => el.classList.remove('field-error'));
@@ -728,8 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ---------- Log-In form ----------
-       Checks the entered username (email) and password against the
-       accounts saved by the Sign-Up form above. */
+       Checks the email + password against login.php. */
     const loginSubmit = document.getElementById('login-submit');
     if (loginSubmit) {
         const usernameInput = document.getElementById('login-username');
@@ -799,10 +793,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // login.php has already started the real PHP session by
-                // this point — the browser now holds the session cookie.
-                // Just update our in-memory copy to match immediately
-                // (no need to re-fetch session-check.php right away).
+                // login.php already started the real session by this point —
+                // just update our copy so the page reacts right away.
                 const role = data.user.role === 'admin' ? 'admin' : 'user';
 
                 currentUser = {
@@ -810,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     lastName: data.user.lastName,
                     email: data.user.email,
                     role: role,
-                    avatarDataUrl: null
+                    avatarPath: data.user.avatarPath || null
                 };
                 refreshAuthHeaderUI();
                 closeAuthModal('login');

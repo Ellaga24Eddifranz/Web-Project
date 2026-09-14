@@ -1,8 +1,7 @@
 <?php
-// GET /user-data.php
-// Returns the logged-in user's own recent activity + submitted project
-// briefs, for the User Dashboard. Always scoped to the current session's
-// email — never returns another user's data.
+// user-data.php
+// Sends back this user's own activity log and their own submitted
+// briefs, for their dashboard. Only ever shows their own data.
 
 session_start();
 header('Content-Type: application/json');
